@@ -64,10 +64,6 @@ def print_board():
 
 	print()
 
-#board.turn = checkers.BLACK
-
-# checkers.svg.piece(checkers.Piece(True, checkers.RED), 1)
-
 checkers.svg.board(board)
 
 while True:
