@@ -55,8 +55,8 @@ def piece(piece, img = svgwrite.Drawing(size = (64, 64)), size = 64 * 1.5, cente
 	
 	return g
 	
-def board(board):
-	img = svgwrite.Drawing('board.svg', size=(64 * 8 + 32, 64 * 8 + 32), profile='tiny')
+def board(filename, board):
+	img = svgwrite.Drawing(filename, size=(64 * 8 + 32, 64 * 8 + 32), profile='tiny')
 
 	light = True
 

@@ -64,7 +64,7 @@ def print_board():
 
 	print()
 
-checkers.svg.board(board)
+checkers.svg.board("board.svg", board)
 
 while True:
 	input()
@@ -76,7 +76,7 @@ while True:
 
 	print(f"It is {'reds turn' if board.turn else 'blacks turn'}!")
 
-	checkers.svg.board(board)
+	checkers.svg.board("board.svg", board)
 
 	move = input("Enter move: ")
 
@@ -111,7 +111,7 @@ while True:
 	if board.is_game_over():
 		os.system("clear")
 
-		checkers.svg.board(board)
+		checkers.svg.board("board.svg", board)
 
 		print_board()
 	
