@@ -91,9 +91,9 @@ def board(filename, board):
 
 			light = not light
 
-		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 12), fill = COLORS["margin_text"]))
+		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 12), fill = COLORS["margin_text"], style = "font-family:\"Sans\""))
 
-		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 16 + 64 * 8 + 12), fill = COLORS["margin_text"]))
+		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 16 + 64 * 8 + 12), fill = COLORS["margin_text"], style = "font-family:\"Sans\""))
 
 		light = not light
 
