@@ -6,14 +6,14 @@ import os
 # board = checkers.Board("-p-k-p-k/k-p-k-p-/-----P--/8/-----P--/--p-----/-K-K-K-K/P-P-----")
 
 board = checkers.Board("""
+-P-P-P-P/
+P-P-P-P-/
+-P-P-P-P/
 --------/
-----P---/
----k----/
---P-P---/
 --------/
---P-P---/
---------/
---------""")
+p-p-p-p-/
+-p-p-p-p/
+p-p-p-p-""")
 
 # Bug D6B4D2 and D6F4D2
 
@@ -64,7 +64,13 @@ def print_board():
 
 	print()
 
-checkers.svg.board("board.svg", board)
+file = open("board.svg", "w")
+
+file.write(checkers.svg.board(board))
+
+file.close()
+
+last = None
 
 while True:
 	input()
@@ -76,7 +82,11 @@ while True:
 
 	print(f"It is {'reds turn' if board.turn else 'blacks turn'}!")
 
-	checkers.svg.board("board.svg", board)
+	file = open("board.svg", "w")
+
+	file.write(checkers.svg.board(board, last))
+
+	file.close()
 
 	move = input("Enter move: ")
 
@@ -100,6 +110,8 @@ while True:
 	# print(board.is_legal(checkers.Move.from_uci(move)))
 
 	try:
+		last = board.parse_uci(move)
+		
 		board.play_move(board.parse_uci(move))
 	except Exception as e:
 		print("Invalid move!", e)
@@ -111,7 +123,11 @@ while True:
 	if board.is_game_over():
 		os.system("clear")
 
-		checkers.svg.board("board.svg", board)
+		file = open("board.svg", "w")
+
+		file.write(checkers.svg.board(board, last))
+
+		file.close()
 
 		print_board()
 	

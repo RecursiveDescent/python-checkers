@@ -25,6 +25,8 @@ COLORS = {
 
 	"light_square": "#ffce9e",
 	"dark_square": "#d18b47",
+	"light_square_lastmove": "#cdd16a",
+	"dark_square_lastmove": "#aaa23b",
 
 	 "margin": "#212121",
 	 "margin_text": "#e5e5e5"
@@ -55,10 +57,16 @@ def piece(piece, img = svgwrite.Drawing(size = (64, 64)), size = 64 * 1.5, cente
 	
 	return g
 	
-def board(filename, board):
-	img = svgwrite.Drawing(filename, size=(64 * 8 + 32, 64 * 8 + 32), profile='tiny')
+def board(board, lastmove = None):
+	img = svgwrite.Drawing("", size=(64 * 8 + 32, 64 * 8 + 32), profile='full')
 
-	light = True
+	light = False
+
+	img.add(Wrapper("""
+	    <defs>
+    <style type="text/css">@import url('https://fonts.googleapis.com/css?family=Lato|Open+Sans|Oswald|Raleway|Roboto|Indie+Flower|Gamja+Flower');</style>
+</defs>
+	"""))
 
 	img.add(img.rect(insert = (0, 0), size = (64 * 8 + 32, 64 * 8 + 32), fill = COLORS["margin"]))
 
@@ -79,8 +87,13 @@ def board(filename, board):
 
 			if y == 7:
 				coords_y = True
+
+			color = COLORS["light_square"] if light else COLORS["dark_square"]
+
+			if lastmove and lastmove.contains(checkers.SQUARES[rows[x] + str(y + 1)]):
+				color = COLORS["light_square_lastmove"] if light else COLORS["dark_square_lastmove"]
 			
-			img.add(img.rect(insert = (x * 64 + 16, cy * 64 + 16), size = (64, 64), fill = (COLORS["light_square"] if light else COLORS["dark_square"])))
+			img.add(img.rect(insert = (x * 64 + 16, cy * 64 + 16), size = (64, 64), fill = color))
 
 			if board.squares[checkers.SQUARES[rows[x] + str(y + 1)]] != checkers.EMPTY:
 				square = board.squares[checkers.SQUARES[rows[x] + str(y + 1)]]
@@ -91,12 +104,10 @@ def board(filename, board):
 
 			light = not light
 
-		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 12), fill = COLORS["margin_text"], style = "font-family:\"Sans\""))
+		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 12), fill = COLORS["margin_text"], style = "font-family: m nw2ddd"))
 
-		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 16 + 64 * 8 + 12), fill = COLORS["margin_text"], style = "font-family:\"Sans\""))
+		img.add(img.text(rows[x].lower(), insert = (46 + 64 * x, 16 + 64 * 8 + 12), fill = COLORS["margin_text"]))
 
 		light = not light
-
-	img.save()
-		
-
+	
+	return ET.tostring(img.get_xml()).decode()

@@ -28,6 +28,12 @@ class Move:
 
 		self.promotion = (to_square >= 0 and to_square < 8) or (to_square >= 56 and to_square < 64)
 
+	def uci(self):
+		return checkers.index_to_square(self.from_square) + checkers.index_to_square(self.to_square)
+
+	def contains(self, square):
+		return self.from_square == square or self.to_square == square
+
 	def from_uci(uci_string):
 		if len(uci_string) % 2 != 0 or len(uci_string) < 4:
 			raise ValueError("Invalid uci string: %s" % uci_string)
@@ -82,6 +88,21 @@ class MultiJump(Move):
 		else:
 			super().__init__(0, 0)
 
+	def uci(self):
+		uci = ""
+				
+		for move in self.moves:
+			uci += move.uci()
+
+		return uci
+
+	def contains(self, square):
+		for move in self.moves:
+			if move.contains(square):
+				return True
+
+		return False
+
 	def __str__(self):
 		string = "["
 
@@ -91,7 +112,7 @@ class MultiJump(Move):
 		return string + "]"
 
 class Board:
-	def __init__(self, fen):
+	def __init__(self, fen = "-P-P-P-P/P-P-P-P-/-P-P-P-P/--------/--------/p-p-p-p-/-p-p-p-p/p-p-p-p-"):
 		self.squares = [0] * 64
 
 		self.load_fen(fen)
@@ -102,7 +123,9 @@ class Board:
 
 		self.move_stack = []
 
-		self.required_jumps = True
+		self.require_jumps = True
+
+		self.require_all_jumps = True
 
 		self.legal_moves = LegalMoveGenerator(self)
 
@@ -114,12 +137,13 @@ class Board:
 		squares = []
 
 		for sq in range(len(self.squares)):
-			if self.squares[sq] != checkers.EMPTY and self.squares[sq] & player == player:
+			if self.squares[sq] != checkers.EMPTY and self.squares[sq] & 1 == player:
 				squares.append(sq)
 
 		return squares
 
 	# Implementation of pseudo-FEN for checkers, only suitable for setting starting state
+	
 	def load_fen(self, fen):
 		self.red_pieces = 0
 
@@ -152,6 +176,7 @@ class Board:
 
 				i += 1
 
+	
 	def do_move(self, move):
 		if len(move.drops) > 0:
 			move.dropped = []
@@ -177,6 +202,7 @@ class Board:
 
 		self.squares[move.from_square] = checkers.EMPTY
 
+	
 	def undo_move(self, move):
 		self.squares[move.from_square] = self.squares[move.to_square]
 
@@ -256,11 +282,17 @@ class Board:
 
 		# Temporarily mark square as empty so you can jump onto the same square
 		saved = self.squares[square]
-
+		
 		self.squares[square] = checkers.EMPTY
 
+		# Prevents trying to jump the piece that was just jumped
+		came_from = None
+
+		if last:
+			came_from = last.from_square
+
 		if up and upper_left >= 0 and upper_left < 64 and not self.is_free(upper_left) and self.squares[upper_left] & 1 != self.turn:
-			if self.is_free(upper_left - 8 - 1) and abs(((upper_left - 8 - 1) % 8) - square % 8) < 3:
+			if self.is_free(upper_left - 8 - 1) and abs(((upper_left - 8 - 1) % 8) - square % 8) < 3 and upper_left - 8 - 1 != came_from:
 				jumps.append(Move(square, upper_left - 8 - 1, [upper_left], last))
 				
 				for j in self.calculate_jumps(upper_left - 8 - 1, up, down, visited, jumps[-1]):
@@ -269,7 +301,7 @@ class Board:
 				visited.append(upper_left - 8 - 1)
 		
 		if up and upper_right >= 0 and upper_right < 64 and not self.is_free(upper_right) and self.squares[upper_right] & 1 != self.turn:
-			if self.is_free(upper_right - 8 + 1) and abs(((upper_right - 8 + 1) % 8) - square % 8) < 3:
+			if self.is_free(upper_right - 8 + 1) and abs(((upper_right - 8 + 1) % 8) - square % 8) < 3 and upper_right - 8 + 1 != came_from:
 				jumps.append(Move(square, upper_right - 8 + 1, [upper_right], last))
 
 				for j in self.calculate_jumps(upper_right - 8 + 1, up, down, visited, jumps[-1]):
@@ -278,7 +310,7 @@ class Board:
 				visited.append(upper_right - 8 + 1)
 
 		if down and lower_left >= 0 and lower_left < 64 and not self.is_free(lower_left) and self.squares[lower_left] & 1 != self.turn:
-			if self.is_free(lower_left + 8 - 1) and abs(((lower_left + 8 - 1) % 8) - square % 8) < 3:
+			if self.is_free(lower_left + 8 - 1) and abs(((lower_left + 8 - 1) % 8) - square % 8) < 3 and lower_left + 8 - 1 != came_from:
 				jumps.append(Move(square, lower_left + 8 - 1, [lower_left], last))
 
 				for j in self.calculate_jumps(lower_left + 8 - 1, up, down, visited, jumps[-1]):
@@ -288,7 +320,7 @@ class Board:
 
 		
 		if down and lower_right >= 0 and lower_right < 64 and not self.is_free(lower_right) and self.squares[lower_right] & 1 != self.turn:
-			if self.is_free(lower_right + 8 + 1) and abs(((lower_right + 8 + 1) % 8) - square % 8) < 3:
+			if self.is_free(lower_right + 8 + 1) and abs(((lower_right + 8 + 1) % 8) - square % 8) < 3 and lower_right + 8 + 1 != came_from:
 				jumps.append(Move(square, lower_right + 8 + 1, [lower_right], last))
 
 				for j in self.calculate_jumps(lower_right + 8 + 1, up, down, visited, jumps[-1]):
@@ -299,9 +331,34 @@ class Board:
 		self.squares[square] = saved
 						
 		return jumps
-
 	
+	
+	
+	def count_jumps(self, square, up = False, down = False):
+		potential_jumps = self.calculate_jumps(square, up, down)
 
+		max = 0
+
+		for jump in potential_jumps:
+			chain = []
+
+			chain.append(jump)
+
+			taken = 1
+
+			current = jump
+
+			while current.last:
+				taken += 1
+				
+				chain.append(current.last)
+
+				current = current.last
+
+			if len(chain) > max:
+				max = len(chain)
+
+		return max
 	
 	
 	def _jumps_to_square(self, move, king):
@@ -331,7 +388,7 @@ class Board:
 
 		
 		return [j for j in potential_jumps if filter_path(j)]
-
+	
 	
 	
 	
@@ -348,6 +405,14 @@ class Board:
 			return False
 
 		if source & 1 != self.turn:
+			return False
+
+		up = self.squares[move.from_square] & 1 == checkers.RED
+		down = self.squares[move.from_square] & 1 == checkers.BLACK
+
+		jumps_taken = len(move.moves) if type(move) is MultiJump else 1
+		
+		if self.require_all_jumps and self.count_jumps(move.from_square, up or source & checkers.KING, down or source & checkers.KING) > jumps_taken:
 			return False
 
 		potential_jumps = sorted(self._jumps_to_square(move, source & checkers.KING), key = lambda jump: abs(jump.from_square - move.from_square))
@@ -377,11 +442,12 @@ class Board:
 			if int(to[1]) > int(pos[1]) and not source & checkers.KING:
 				return False
 
-		if self.required_jumps and self.has_jump(self.turn):
+		if self.require_jumps and self.has_jump(self.turn):
 			return False
 
 		return True
-
+	
+	
 	
 	def parse_uci(self, uci):
 		move = checkers.Move.from_uci(uci)
@@ -395,6 +461,8 @@ class Board:
 				raise e
 
 		return move
+	
+	
 	
 	def play_move(self, move):
 		source = self.squares[move.from_square]
@@ -412,6 +480,16 @@ class Board:
 			raise checkers.IllegalMoveError("Target square is not empty.")
 		
 		rows = "ABCDEFGH"
+
+		up = self.squares[move.from_square] & 1 == checkers.RED
+		down = self.squares[move.from_square] & 1 == checkers.BLACK
+
+		jumps_taken = len(move.moves) if type(move) is MultiJump else 1
+
+		print(self.count_jumps(move.from_square, up or source & checkers.KING, down or source & checkers.KING), jumps_taken)
+		
+		if self.require_all_jumps and self.count_jumps(move.from_square, up or source & checkers.KING, down or source & checkers.KING) > jumps_taken:
+			raise checkers.IllegalMoveError("All jumps must be taken.")
 
 		# Filter the list of potential jumps to jumps that end in the target square
 		# Sort the list of potential jumps by distance
@@ -472,11 +550,12 @@ class Board:
 			if int(to[1]) > int(pos[1]) and not source & checkers.KING:
 				raise checkers.IllegalMoveError("Illegal move. (Cannot move backwards as a normal piece)")
 
-		if self.required_jumps and self.has_jump(self.turn):
+		if self.require_jumps and self.has_jump(self.turn):
 			raise checkers.IllegalMoveError("Illegal move. (A jump is available and must be taken)")
 
 		self.push(move)
 
+	
 	def has_jump(self, player):
 		for square in self.get_player_pieces(player):
 			up = self.squares[square] & 1 == checkers.RED
@@ -488,9 +567,11 @@ class Board:
 
 		return False
 
+	
 	def is_game_over(self):
 		return self.red_pieces == 0 or self.black_pieces == 0
 
+	
 	def winner(self):
 		if self.black_pieces == 0:
 			return checkers.RED
