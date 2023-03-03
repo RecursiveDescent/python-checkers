@@ -359,6 +359,38 @@ class Board:
 				max = len(chain)
 
 		return max
+
+	def get_longest_jump(self, square, up = False, down = False):
+		potential_jumps = self.calculate_jumps(square, up, down)
+
+		max = 0
+		 
+		longest = []
+
+		for jump in potential_jumps:
+			chain = []
+			
+			chain.append(jump)
+
+			taken = 1
+
+			current = jump
+
+			while current.last:
+				taken += 1
+				
+				chain.append(current.last)
+
+				current = current.last
+
+			if len(chain) > max:
+				max = len(chain)
+
+				longest = chain
+
+		longest.reverse()
+
+		return longest
 	
 	
 	def _jumps_to_square(self, move, king):
@@ -388,9 +420,6 @@ class Board:
 
 		
 		return [j for j in potential_jumps if filter_path(j)]
-	
-	
-	
 	
 	def is_legal(self, move):
 		source = self.squares[move.from_square]
@@ -435,6 +464,9 @@ class Board:
 		if abs("ABCDEFGH".index(pos[0]) - "ABCDEFGH".index(to[0])) > 1 or abs(int(pos[1]) - int(to[1])) > 1:
 			return False
 
+		if pos[1] == to[1]:
+			return False
+
 		if self.turn == checkers.RED:
 			if int(to[1]) < int(pos[1]) and not source & checkers.KING:
 				return False
@@ -446,8 +478,6 @@ class Board:
 			return False
 
 		return True
-	
-	
 	
 	def parse_uci(self, uci):
 		move = checkers.Move.from_uci(uci)
@@ -461,8 +491,6 @@ class Board:
 				raise e
 
 		return move
-	
-	
 	
 	def play_move(self, move):
 		source = self.squares[move.from_square]
@@ -591,6 +619,8 @@ class LegalMoveGenerator:
 
 		self.pieces = self.board.get_pieces()
 
+		self.visited = []
+
 		# A list of already known valid moves that haven't been returned yet
 		self.queued = []
 
@@ -603,75 +633,55 @@ class LegalMoveGenerator:
 	def next(self):
 		turn = self.board.turn
 
-		if self.piece_index >= len(self.board.squares):
+		def scan(frm):
+			_rows = "ABCDEFGH"
+
+			_col = 1
+			
+			_c = 0
+			
+			for i in reversed(range(64)):
+				move = Move(checkers.SQUARES[frm], checkers.SQUARES[f"{_rows[i % 8]}{_col}"])
+
+				if self.board.is_legal(move) and not move.uci() in self.visited:
+					self.visited.append(move.uci())
+
+					return move
+			
+				_c += 1
+			
+				if _c == 8:
+					_c = 0
+					_col += 1
+
+			return None
+
+		result = None
+		
+		for i in self.board.get_player_pieces(self.board.turn):
+			if self.board.squares[i] != checkers.EMPTY:
+				up = self.board.squares[i] & 1 == checkers.RED
+				down = self.board.squares[i] & 1 == checkers.BLACK
+		
+				jumps = self.board.get_longest_jump(i, up or self.board.squares[i] & checkers.KING, down or self.board.squares[i] & checkers.KING)
+				
+				if len(jumps) > 0:
+					move = MultiJump(jumps)
+
+					if not move.uci() in self.visited:
+						self.visited.append(move.uci())
+	
+						return move
+				
+				result = scan(checkers.index_to_square(i))
+	
+				if result != None:
+					break
+
+		if result == None:
 			raise StopIteration()
 
-		square = self.piece_index
-
-		piece = self.board.squares[square]
-
-		self.piece_index += 1
-
-		pos = checkers.index_to_square(square)
-
-		if piece & 1 == checkers.RED or piece & checkers.KING:
-			dr = f"{chr(ord(pos[0]) + 1)}{int(pos[1]) - 1}"
-
-			dl = f"{chr(ord(pos[0]) - 1)}{int(pos[1]) - 1}"
-
-			try:
-				if self.board.is_free(checkers.parse_square(dr)):
-					move = Move(square, checkers.parse_square(dr))
-
-					if self.board.is_legal(move):
-						self.queued.append(move)
-	
-				if self.board.is_free(checkers.parse_square(dl)):
-					move = Move(square, checkers.parse_square(dl))
-
-					if self.board.is_legal(move):
-						self.queued.append(move)
-			except Exception:
-				pass
-
-		if (piece & 1 == checkers.BLACK or piece & checkers.KING) and not int(pos[1]) + 1 > 8:
-			ur = f"{chr(ord(pos[0]) + 1)}{int(pos[1]) + 1}"
-
-			ul = f"{chr(ord(pos[0]) - 1)}{int(pos[1]) + 1}"
-
-			try:
-				if self.board.is_free(checkers.parse_square(ur)):
-					move = Move(square, checkers.parse_square(ur))
-
-					if self.board.is_legal(move):
-						self.queued.append(move)
-	
-				if self.board.is_free(checkers.parse_square(ul)):
-					move = Move(square, checkers.parse_square(ul))
-
-					if self.board.is_legal(move):
-						self.queued.append(move)
-			except Exception:
-				pass
-
-		self.board.turn = piece & 1
-
-		up = self.board.squares[square] & 1 == checkers.RED
-
-		down = self.board.squares[square] & 1 == checkers.BLACK
-
-		try:
-			for move in [s for s in self.board.calculate_jumps(square, up or self.board.squares[square] & checkers.KING, down or self.board.squares[square]  & checkers.KING) if self.board.squares[s.from_square] != checkers.EMPTY]:
-				self.queued.append(move)
-		except KeyError:
-			pass
-
-		self.board.turn = turn
-		
-		if not self.any:
-			self.queued = [m for m in self.queued if self.board.squares[m.from_square] & 1 == turn or m.last != None]
-
-		return self.queued.pop() if len(self.queued) > 0 else self.next()
+		return result
 
 	def __next__(self):
 		return self.next()
