@@ -36,7 +36,7 @@ class Move:
 
 	def from_uci(uci_string):
 		if len(uci_string) % 2 != 0 or len(uci_string) < 4:
-			raise ValueError("Invalid uci string: %s" % uci_string)
+			raise checkers.InvalidMoveError("Invalid uci string: %s" % uci_string)
 
 		if len(uci_string) > 4:
 			ucistr = uci_string
@@ -60,7 +60,7 @@ class Move:
 
 				return MultiJump(moves)
 			except:
-				raise ValueError("Invalid uci string: %s" % uci_string)
+				raise checkers.InvalidMoveError("Invalid uci string: %s" % uci_string)
 				
 		
 		try:
@@ -70,7 +70,7 @@ class Move:
 
 			return Move(from_square, to_square)
 		except KeyError:
-			raise ValueError("Invalid move: " + uci_string)
+			raise checkers.InvalidMoveError("Invalid move: " + uci_string)
 
 	def __str__(self):
 		return f"<{checkers.index_to_square(self.from_square)} {checkers.index_to_square(self.to_square)} {[checkers.index_to_square(square) for square in self.drops]}>"
@@ -90,9 +90,13 @@ class MultiJump(Move):
 
 	def uci(self):
 		uci = ""
+
+		c = 0
 				
 		for move in self.moves:
-			uci += move.uci()
+			uci += move.uci() if c % 2 == 0 else checkers.index_to_square(move.to_square)
+
+			c += 1
 
 		return uci
 
@@ -493,8 +497,6 @@ class Board:
 		return move
 	
 	def play_move(self, move):
-		move.drops = [] # Just in case theres some weird issues if an already used move is passed in
-		
 		source = self.squares[move.from_square]
 
 		target = self.squares[move.to_square]
@@ -526,7 +528,9 @@ class Board:
 		potential_jumps = sorted(self._jumps_to_square(move, source & checkers.KING), key = lambda jump: abs(jump.from_square - move.from_square))
 
 		if type(move) is MultiJump:
-			populated = MultiJump([]) # The drops of the moves in this object will be guaranteed filled unlike the one passed
+			populated = MultiJump([])
+
+			#move.drops = []
 			
 			for i in range(len(move.moves)):
 				m = move.moves[i]
@@ -541,7 +545,9 @@ class Board:
 
 				populated.moves.append(ptnmove)
 
-				move.drops.append(*ptnmove.drops)
+				move.drops += ptnmove.drops
+
+				
 
 			self.move_stack.append(populated)
 
@@ -554,6 +560,8 @@ class Board:
 
 		if len(potential_jumps) > 0:
 			chain = []
+
+			#move.drops = []
 
 			jump = potential_jumps[0]
 
