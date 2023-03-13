@@ -493,6 +493,8 @@ class Board:
 		return move
 	
 	def play_move(self, move):
+		move.drops = [] # Just in case theres some weird issues if an already used move is passed in
+		
 		source = self.squares[move.from_square]
 
 		target = self.squares[move.to_square]
@@ -532,10 +534,14 @@ class Board:
 				if len([mm for mm in potential_jumps if mm.from_square == m.from_square and mm.to_square == m.to_square]) == 0:
 					raise checkers.IllegalMoveError("Invalid path to target square.")
 
-				# Get the potential jump that matches this move
-				self.do_move([mm for mm in potential_jumps if mm.from_square == m.from_square and mm.to_square == m.to_square][0])
+				ptnmove = [mm for mm in potential_jumps if mm.from_square == m.from_square and mm.to_square == m.to_square][0]
 
-				populated.moves.append([mm for mm in potential_jumps if mm.from_square == m.from_square and mm.to_square == m.to_square][0])
+				# Get the potential jump that matches this move
+				self.do_move(ptnmove)
+
+				populated.moves.append(ptnmove)
+
+				move.drops.append(*ptnmove.drops)
 
 			self.move_stack.append(populated)
 
@@ -558,8 +564,9 @@ class Board:
 
 				jump = jump.last
 
-			for move in reversed(chain):
-				self.push(move)
+			for m in reversed(chain):
+				move.drops.append(*m.drops)
+				self.push(m)
 
 			return
 
