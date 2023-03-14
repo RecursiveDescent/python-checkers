@@ -15,12 +15,12 @@ class Piece:
 		return repr + f" {checkers.index_to_square(self.square)}"
 
 class Move:
-	def __init__(self, from_square, to_square, drops = [], last = None):
+	def __init__(self, from_square, to_square, drops = None, last = None):
 		self.from_square = from_square
 		
 		self.to_square = to_square
 
-		self.drops = drops
+		self.drops = drops or []
 
 		self.dropped = []
 
@@ -265,7 +265,9 @@ class Board:
 	def is_free(self, square):
 		return square >= 0 and square < 64 and self.squares[square] == checkers.EMPTY
 
-	def calculate_jumps(self, square, up = False, down = False, visited = [], last = None):
+	def calculate_jumps(self, square, up = False, down = False, visited = None, last = None):
+		visited = visited or []
+		
 		if square in visited:
 			return []
 		
@@ -497,6 +499,8 @@ class Board:
 		return move
 	
 	def play_move(self, move):
+		move.drops = []
+		
 		source = self.squares[move.from_square]
 
 		target = self.squares[move.to_square]
@@ -529,8 +533,6 @@ class Board:
 
 		if type(move) is MultiJump:
 			populated = MultiJump([])
-
-			#move.drops = []
 			
 			for i in range(len(move.moves)):
 				m = move.moves[i]
@@ -547,8 +549,6 @@ class Board:
 
 				move.drops += ptnmove.drops
 
-				
-
 			self.move_stack.append(populated)
 
 			self.turn = not self.turn
@@ -560,8 +560,6 @@ class Board:
 
 		if len(potential_jumps) > 0:
 			chain = []
-
-			#move.drops = []
 
 			jump = potential_jumps[0]
 
