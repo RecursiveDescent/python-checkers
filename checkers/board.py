@@ -554,11 +554,14 @@ class LegalMoveGenerator:
     
 	def __iter__(self):
 		pieces = self.pieces if self.any else (self.board.red_pieces if self.board.turn == checkers.RED else self.board.black_pieces)
+
+		has_jump = False
 		
 		for tile in pieces:
 			paths = tile.get_all_multijumps()
 
-			#print(paths)
+			if len(paths) > 0:
+				has_jump = True
 
 			for path in paths:
 				#print("PATH: ", path)
@@ -599,9 +602,9 @@ class LegalMoveGenerator:
 				yield jump
 
 
-			
-			
-			if len(paths) == 0:
+
+		if not has_jump:
+			for tile in pieces:
 				for move in tile.get_moves():
 					yield Move(move[0].index(), move[1].index(), [])
 		

@@ -5,3 +5,4 @@ venv
 .replit
 replit.nix
 .upm
+.breakpoints
