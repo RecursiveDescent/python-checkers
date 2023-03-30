@@ -50,14 +50,14 @@ def piece(piece, img = svgwrite.Drawing(size = (64, 64)), size = 64 * 1.5, cente
 
 	g.add(img.circle(center=(center[0], center[1]), r=base / 4.5, fill = color))
 
-	if piece.is_king:
+	if piece.type == checkers.KING:
 		s = Wrapper(crown.replace("SCALE", str(0.8)).replace("CX", str(center[0] - 18 * 0.8)).replace("CY", str(center[1] - 40 * 0.8)))
 		
 		g.add(s)
 	
 	return g
 	
-def board(board, lastmove = None):
+def board(board, lastmove = None, flip = False):
 	img = svgwrite.Drawing("", size=(64 * 8 + 32, 64 * 8 + 32), profile='full')
 
 	light = False
@@ -76,9 +76,9 @@ def board(board, lastmove = None):
 
 	for x in range(8):
 		for y in range(8):
-			flip = [*reversed([0,1,2,3,4,5,6,7])]
+			flipped = [*reversed([0,1,2,3,4,5,6,7])] if not flip else [0,1,2,3,4,5,6,7]
 		
-			cy = flip.index(y)
+			cy = flipped.index(y) if not flip else y
 
 			if not coords_y:
 				img.add(img.text(str(cy + 1), insert = (5, 50 + 64 * y), fill = COLORS["margin_text"]))
@@ -90,15 +90,15 @@ def board(board, lastmove = None):
 
 			color = COLORS["light_square"] if light else COLORS["dark_square"]
 
-			if lastmove and lastmove.contains(checkers.SQUARES[rows[x] + str(y + 1)]):
+			if lastmove and lastmove.contains(checkers.parse_square(rows[x] + str(y + 1))):
 				color = COLORS["light_square_lastmove"] if light else COLORS["dark_square_lastmove"]
 			
 			img.add(img.rect(insert = (x * 64 + 16, cy * 64 + 16), size = (64, 64), fill = color))
 
-			if board.squares[checkers.SQUARES[rows[x] + str(y + 1)]] != checkers.EMPTY:
-				square = board.squares[checkers.SQUARES[rows[x] + str(y + 1)]]
+			if board.squares[x][y].piece:
+				square = board.squares[x][y]
 			
-				piece = checkers.svg.piece(checkers.Piece(square & checkers.KING, square & checkers.RED), img, center = (x * 64 + 32 + 16, cy * 64 + 32 + 16))
+				piece = checkers.svg.piece(checkers.Piece(square.piece.color, square.piece.type), img, center = (x * 64 + 32 + 16, cy * 64 + 32 + 16))
 
 				img.add(piece)
 
@@ -111,3 +111,5 @@ def board(board, lastmove = None):
 		light = not light
 	
 	return ET.tostring(img.get_xml()).decode()
+		
+

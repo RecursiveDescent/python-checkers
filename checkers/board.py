@@ -1,19 +1,5 @@
 import checkers
 
-class Piece:
-	def __init__(self, king, color):
-		self.is_king = king
-
-		self.color = color
-
-	def __repr__(self):
-		repr = "K" if self.is_king else "P"
-
-		if self.color == checkers.RED:
-			repr = repr.lower()
-
-		return repr + f" {checkers.index_to_square(self.square)}"
-
 class Move:
 	def __init__(self, from_square, to_square, drops = None, last = None):
 		self.from_square = from_square
@@ -26,10 +12,22 @@ class Move:
 
 		self.last = last
 
-		self.promotion = (to_square >= 0 and to_square < 8) or (to_square >= 56 and to_square < 64)
+	# Convenience for getting tile from the index
+	def source(self, board):
+		return board[self.from_square[0]][self.from_square[1]]
+	
+	def target(self, board):
+		return board[self.to_square[0]][self.to_square[1]]
+
+	def squares(self):
+		return [self.from_square, self.to_square]
+
+		#self.promotion = (to_square >= 0 and to_square < 8) or (to_square >= 56 and to_square < 64)
 
 	def uci(self):
-		return checkers.index_to_square(self.from_square) + checkers.index_to_square(self.to_square)
+		rows = "ABCDEFGH"
+		
+		return rows[self.from_square[0]] + str(self.from_square[1] + 1) + rows[self.to_square[0]] + str(self.to_square[1] + 1)
 
 	def contains(self, square):
 		return self.from_square == square or self.to_square == square
@@ -55,8 +53,8 @@ class Move:
 				lastsq = move.to_square
 
 			try:
-				if not checkers.SQUARES[ucistr[:2].upper()] == lastsq:
-					moves.append(Move(lastsq, checkers.SQUARES[ucistr[:2].upper()]))
+				if not checkers.parse_square(ucistr[:2].upper()) == lastsq:
+					moves.append(Move(lastsq, checkers.parse_square(ucistr[:2].upper())))
 
 				return MultiJump(moves)
 			except:
@@ -64,9 +62,9 @@ class Move:
 				
 		
 		try:
-			from_square = checkers.SQUARES[uci_string[0:2].upper()]
+			from_square = checkers.parse_square(uci_string[0:2].upper())
 	
-			to_square = checkers.SQUARES[uci_string[2:4].upper()]
+			to_square = checkers.parse_square(uci_string[2:4].upper())
 
 			return Move(from_square, to_square)
 		except KeyError:
@@ -79,6 +77,8 @@ class Move:
 		return str(self)
 
 
+
+
 class MultiJump(Move):
 	def __init__(self, moves):
 		self.moves = moves
@@ -87,6 +87,14 @@ class MultiJump(Move):
 			super().__init__(self.moves[0].from_square, self.moves[-1].to_square)
 		else:
 			super().__init__(0, 0)
+
+	def squares(self):
+		sqrs = []
+
+		for move in self.moves:
+			sqrs.append(*move.squares())
+
+		return sqrs
 
 	def uci(self):
 		uci = ""
@@ -115,11 +123,239 @@ class MultiJump(Move):
 
 		return string + "]"
 
+
+
+
+class Piece:
+	def __init__(self, color, type):
+		self.color = color
+
+		self.type = type
+
+	def __repr__(self):
+		repr = "K" if self.type == checkers.KING else "P"
+
+		if self.color == checkers.RED:
+			repr = repr.lower()
+
+		return repr
+
+
+
+				
+class Tile:
+	def __init__(self, x, y, piece = None):
+		self.x = x
+		
+		self.y = y
+		
+		self.piece = piece
+
+		self.upper_left = None
+
+		self.upper_right = None
+
+		self.lower_left = None
+
+		self.lower_right = None
+
+	def index(self):
+		return (self.x, self.y)
+
+	def ascii(self):
+		return self.piece or "-"
+
+	def follow_jump(self, square):
+		jump = None
+
+		square = checkers.parse_square(square)
+
+		if self.upper_left and (self.upper_left.x, self.upper_left.y) == square:
+			jump = self.upper_left
+
+		if self.upper_right and (self.upper_right.x, self.upper_right.y) == square:
+			jump = self.upper_right
+
+		if self.lower_left and (self.lower_left.x, self.lower_left.y) == square:
+			jump = self.lower_left
+
+		if self.lower_right and (self.lower_right.x, self.lower_right.y) == square:
+			jump = self.lower_right
+
+		if jump.piece:
+			return jump
+
+		return None
+	
+	def get_moves(self):
+	    moves = []
+		
+	    if self.piece is None:
+	        return moves
+	    
+	    # Check for moves to the upper left
+	    if self.upper_left is not None and self.upper_left.piece is None:
+	        if self.piece.color == checkers.RED or self.piece.type == checkers.KING:
+	            moves.append((self, self.upper_left))
+	    
+	    # Check for moves to the upper right
+	    if self.upper_right is not None and self.upper_right.piece is None:
+	        if self.piece.color == checkers.RED or self.piece.type == checkers.KING:
+	            moves.append((self, self.upper_right))
+	    
+	    # Check for moves to the lower left
+	    if self.lower_left is not None and self.lower_left.piece is None:
+	        if self.piece.color == checkers.BLACK or self.piece.type == checkers.KING:
+	            moves.append((self, self.lower_left))
+	    
+	    # Check for moves to the lower right
+	    if self.lower_right is not None and self.lower_right.piece is None:
+	        if self.piece.color == checkers.BLACK or self.piece.type == checkers.KING:
+	            moves.append((self, self.lower_right))
+	    
+	    return moves
+
+
+	def get_jumps(self):
+		jumps = []
+		
+		if self.piece is None:
+			return jumps
+	    
+	    # Check for jumps to the upper left
+		if self.upper_left is not None and self.upper_left.piece is not None and self.upper_left.piece.color != self.piece.color and self.upper_left.upper_left is not None and self.upper_left.upper_left.piece is None:
+			if self.piece.color == checkers.RED or self.piece.type == checkers.KING:
+				jumps.append((self, self.upper_left, self.upper_left.upper_left))
+	    
+	    # Check for jumps to the upper right
+		if self.upper_right is not None and self.upper_right.piece is not None and self.upper_right.piece.color != self.piece.color and self.upper_right.upper_right is not None and self.upper_right.upper_right.piece is None:
+			if self.piece.color == checkers.RED or self.piece.type == checkers.KING:
+				jumps.append((self, self.upper_right, self.upper_right.upper_right))
+	    
+	    # Check for jumps to the lower left
+		if self.lower_left is not None and self.lower_left.piece is not None and self.lower_left.piece.color != self.piece.color and self.lower_left.lower_left is not None and self.lower_left.lower_left.piece is None:
+			if self.piece.color == checkers.BLACK or self.piece.type == checkers.KING:
+				jumps.append((self, self.lower_left, self.lower_left.lower_left))
+	    
+	    # Check for jumps to the lower right
+		if self.lower_right is not None and self.lower_right.piece is not None and self.lower_right.piece.color != self.piece.color and self.lower_right.lower_right is not None and self.lower_right.lower_right.piece is None:
+			if self.piece.color == checkers.BLACK or self.piece.type == checkers.KING:
+				jumps.append((self, self.lower_right, self.lower_right.lower_right))
+
+		return jumps
+	
+	def jumped(frm, to):
+		return (frm.x + int((to.x - frm.x) / 2), frm.y + int((to.y - frm.y) / 2))
+
+		return False
+
+	def get_all_multijumps(self):
+		def dfs(cur, path, paths, piece = None):
+			path.append(cur)
+	
+			original = cur.piece
+	
+			cur.piece = piece or original
+	
+			jumps = cur.get_jumps()
+	
+			if not any(jumps) and len(path) > 1:
+				paths.append(path.copy())
+			else:
+				for jump in jumps:
+					if jump:
+						branch = path.copy()
+						
+						branch.append(jump[1])
+						
+						dfs(jump[2], branch, paths, jump[0].piece)
+	
+			cur.piece = original
+
+		paths = []
+	
+		dfs(self, [], paths)
+	
+		return paths
+	
+	def get_move(self, direction):
+		if direction == "upper_left":
+			move = Move((self.x, self.y), (self.upper_left.x, self.upper_left.y))
+
+			if self.upper_left and self.upper_left.piece and self.upper_left.piece.color != self.piece.color and self.upper_left.upper_left and self.upper_left.upper_left.piece == None:
+				move.drops.append((self.upper_left.x, self.upper_left.y))
+
+				move.to_square = (self.upper_left.upper_left.x, self.upper_left.upper_left.y)
+
+				return move
+
+			if self.upper_left.piece == None:
+				return move
+
+		if direction == "upper_right":
+			move = Move((self.x, self.y), (self.upper_right.x, self.upper_right.y))
+
+			if self.upper_right and self.upper_right.piece and self.upper_right.piece.color != self.piece.color and self.upper_right.upper_right and self.upper_right.upper_right.piece == None:
+				move.drops.append((self.upper_right.x, self.upper_right.y))
+
+				move.to_square = (self.upper_right.upper_right.x, self.upper_right.upper_right.y)
+
+				return move
+
+			if self.upper_right.piece == None:
+				return move
+
+		if direction == "lower_left":
+			move = Move((self.x, self.y), (self.lower_left.x, self.lower_left.y))
+
+			if self.lower_left and self.lower_left.piece and self.lower_left.piece.color != self.piece.color and self.lower_left.lower_left and self.lower_left.lower_left.piece == None:
+				move.drops.append((self.lower_left.x, self.lower_left.y))
+
+				move.to_square = (self.lower_left.lower_left.x, self.lower_left.lower_left.y)
+
+				return move
+
+			if self.lower_left.piece == None:
+				return move
+
+		if direction == "lower_right":
+			move = Move((self.x, self.y), (self.lower_right.x, self.lower_right.y))
+
+			if self.lower_right and self.lower_right.piece and self.lower_right.piece.color != self.piece.color and self.lower_right.lower_right and self.lower_right.lower_right.piece == None:
+				move.drops.append((self.lower_right.x, self.lower_right.y))
+
+				move.to_square = (self.lower_right.lower_right.x, self.lower_right.lower_right.y)
+
+				return move
+
+			if self.lower_right.piece == None:
+				return move
+
+			return None
+	
+	def uci(self):
+		rows = "ABCDEFGH"
+
+		return rows[self.x] + str(self.y + 1)
+
+	def __str__(self):
+		 return self.uci()
+
+	def __repr__(self):
+		return f"<{self.uci()} [{self.piece or '-'}]>"
+
+
 class Board:
 	def __init__(self, fen = "-P-P-P-P/P-P-P-P-/-P-P-P-P/--------/--------/p-p-p-p-/-p-p-p-p/p-p-p-p-"):
-		self.squares = [0] * 64
+		self.squares = []
 
-		self.load_fen(fen)
+		for x in range(8):
+			col = []
+
+			for y in range(8):
+				col.append(Tile(x, y))
+
+			self.squares.append(col)
 
 		self.turn = checkers.RED
 
@@ -131,31 +367,59 @@ class Board:
 
 		self.require_all_jumps = True
 
+		self.red_pieces = []
+
+		self.black_pieces = []
+
+		self.load_fen(fen)
+
+		self.refresh_tiles()
+
 		self.legal_moves = LegalMoveGenerator(self)
 
-	# Returns squares that contain pieces
-	def get_pieces(self):
-		return [square for square in self.squares if square != checkers.EMPTY]
-
-	def get_player_pieces(self, player):
-		squares = []
-
-		for sq in range(len(self.squares)):
-			if self.squares[sq] != checkers.EMPTY and self.squares[sq] & 1 == player:
-				squares.append(sq)
-
-		return squares
-
 	# Implementation of pseudo-FEN for checkers, only suitable for setting starting state
+
+	def create_tile(self, x, y, piece):
+		tile = Tile(x, y, piece)
+
+		return tile
+
+	
+	def scan_tile(self, x, y):
+		tile = self.squares[x][y]
+
+		if x - 1 >= 0 and y - 1 >= 0:
+			tile.lower_left = self.squares[x - 1][y - 1]
+
+		if x + 1 < 8 and y - 1 >= 0:
+			tile.lower_right = self.squares[x + 1][y - 1]
+
+		if x - 1 >= 0 and y + 1 < 8:
+			tile.upper_left = self.squares[x - 1][y + 1]
+
+		if x + 1 < 8 and y + 1 < 8:
+			tile.upper_right = self.squares[x + 1][y + 1]
+
+		return tile
+
+	
+	
+	def refresh_tiles(self):
+		for x in range(8):
+			for y in range(8):
+				self.scan_tile(x, y)
+				
+
+	# Pseudo-fen
 	
 	def load_fen(self, fen):
-		self.red_pieces = 0
-
-		self.black_pieces = 0
-		
 		spl = fen.replace("\n", "").split("/")
 
 		i = 0
+
+		x = 0
+
+		y = 0
 		
 		for row in spl:
 			if len(row) < 1 or (len(row) < 8 and len(row) > 1) or len(row) > 8:
@@ -166,65 +430,43 @@ class Board:
 					i += int(row[0]) - 1
 				except:
 					raise Exception("Invalid FEN")
+
+			x = 0
 			
 			for column in row:
 				if column == "p" or column == "k":
-					self.squares[i] = (checkers.PIECE if column == "p" else checkers.KING) | checkers.RED
+					self.squares[x][y] = self.create_tile(x, y, Piece(checkers.RED, checkers.PIECE if column == "p" else checkers.KING))
 
-					self.red_pieces += 1
+					self.red_pieces.append(self.squares[x][y])
 
 				if column == "P" or column == "K":
-					self.squares[i] = (checkers.PIECE if column == "P" else checkers.KING) | checkers.BLACK
+					self.squares[x][y] = self.create_tile(x, y, Piece(checkers.BLACK, checkers.PIECE if column == "P" else checkers.KING))
 
-					self.black_pieces += 1
+					self.black_pieces.append(self.squares[x][y])
 
 				i += 1
 
-	
-	def do_move(self, move):
-		if len(move.drops) > 0:
-			move.dropped = []
+				x += 1
+
+			y += 1
 			
-			for sq in move.drops:
-				move.dropped.append(self.squares[sq])
-
-				if self.squares[sq] & 1 == checkers.RED:
-					self.red_pieces -= 1
-				else:
-					self.black_pieces -= 1
-				
-				self.squares[sq] = checkers.EMPTY
-
-		if move.promotion and not self.squares[move.from_square] & checkers.KING:
-			self.squares[move.to_square] = checkers.KING | (self.squares[move.from_square] & 1)
-
-			move.promoted = True
-		else:
-			self.squares[move.to_square] = self.squares[move.from_square]
-
-			move.promoted = False
-
-		self.squares[move.from_square] = checkers.EMPTY
 
 	
-	def undo_move(self, move):
-		self.squares[move.from_square] = self.squares[move.to_square]
+	#def do_move(self, move):
 
-		self.squares[move.to_square] = checkers.EMPTY
+	
+	#def undo_move(self, move):
 
-		# Restore dropped pieces
-		for i in range(len(move.drops)):
-			self.squares[move.drops[i]] = move.dropped[i]
 
-			if move.dropped[i] & 1 == checkers.RED:
-				self.red_pieces += 1
-			else:
-				self.black_pieces += 1
 
-		# Undo promotion
-		if move.promotion:
-			self.squares[move.from_square] = checkers.PIECE | (self.squares[move.from_square] & 1)
 
+
+
+		
+
+	def do_move(self, move):
+		self.squares123123412
+	
 	def push(self, move):
 		if type(move) is MultiJump:
 			for m in move.moves:
@@ -238,6 +480,7 @@ class Board:
 
 		self.legal_moves = LegalMoveGenerator(self)
 
+	
 	def pop(self):
 		if len(self.move_stack) == 0:
 			return None
@@ -256,372 +499,43 @@ class Board:
 
 		return move
 
+	
 	def peek(self):
 		if len(self.move_stack) == 0:
 			return None
 		
 		return self.move_stack[-1]
-
-	def is_free(self, square):
-		return square >= 0 and square < 64 and self.squares[square] == checkers.EMPTY
-
-	def calculate_jumps(self, square, up = False, down = False, visited = None, last = None):
-		visited = visited or []
-		
-		if square in visited:
-			return []
-		
-		upper_right = square - 8 + 1
-
-		lower_right = square + 8 + 1
-
-		upper_left = square - 8 - 1
-
-		lower_left = square + 8 - 1
-
-		jumps = []
-
-		# APPARENTLY, default arguments always point to the same object
-		visited = visited.copy()
-
-		visited.append(square)
-
-		# Temporarily mark square as empty so you can jump onto the same square
-		saved = self.squares[square]
-		
-		self.squares[square] = checkers.EMPTY
-
-		# Prevents trying to jump the piece that was just jumped
-		came_from = None
-
-		if last:
-			came_from = last.from_square
-
-		if up and upper_left >= 0 and upper_left < 64 and not self.is_free(upper_left) and self.squares[upper_left] & 1 != self.turn:
-			if self.is_free(upper_left - 8 - 1) and abs(((upper_left - 8 - 1) % 8) - square % 8) < 3 and upper_left - 8 - 1 != came_from:
-				jumps.append(Move(square, upper_left - 8 - 1, [upper_left], last))
-				
-				for j in self.calculate_jumps(upper_left - 8 - 1, up, down, visited, jumps[-1]):
-					jumps.append(j)
-
-				visited.append(upper_left - 8 - 1)
-		
-		if up and upper_right >= 0 and upper_right < 64 and not self.is_free(upper_right) and self.squares[upper_right] & 1 != self.turn:
-			if self.is_free(upper_right - 8 + 1) and abs(((upper_right - 8 + 1) % 8) - square % 8) < 3 and upper_right - 8 + 1 != came_from:
-				jumps.append(Move(square, upper_right - 8 + 1, [upper_right], last))
-
-				for j in self.calculate_jumps(upper_right - 8 + 1, up, down, visited, jumps[-1]):
-					jumps.append(j)
-
-				visited.append(upper_right - 8 + 1)
-
-		if down and lower_left >= 0 and lower_left < 64 and not self.is_free(lower_left) and self.squares[lower_left] & 1 != self.turn:
-			if self.is_free(lower_left + 8 - 1) and abs(((lower_left + 8 - 1) % 8) - square % 8) < 3 and lower_left + 8 - 1 != came_from:
-				jumps.append(Move(square, lower_left + 8 - 1, [lower_left], last))
-
-				for j in self.calculate_jumps(lower_left + 8 - 1, up, down, visited, jumps[-1]):
-					jumps.append(j)
-
-				visited.append(lower_left + 8 - 1)
-
-		
-		if down and lower_right >= 0 and lower_right < 64 and not self.is_free(lower_right) and self.squares[lower_right] & 1 != self.turn:
-			if self.is_free(lower_right + 8 + 1) and abs(((lower_right + 8 + 1) % 8) - square % 8) < 3 and lower_right + 8 + 1 != came_from:
-				jumps.append(Move(square, lower_right + 8 + 1, [lower_right], last))
-
-				for j in self.calculate_jumps(lower_right + 8 + 1, up, down, visited, jumps[-1]):
-					jumps.append(j)
-
-				visited.append(lower_right + 8 + 1)
-
-		self.squares[square] = saved
-						
-		return jumps
 	
+	#def is_legal(self, move):
 	
-	
-	def count_jumps(self, square, up = False, down = False):
-		potential_jumps = self.calculate_jumps(square, up, down)
-
-		max = 0
-
-		for jump in potential_jumps:
-			chain = []
-
-			chain.append(jump)
-
-			taken = 1
-
-			current = jump
-
-			while current.last:
-				taken += 1
-				
-				chain.append(current.last)
-
-				current = current.last
-
-			if len(chain) > max:
-				max = len(chain)
-
-		return max
-
-	def get_longest_jump(self, square, up = False, down = False):
-		potential_jumps = self.calculate_jumps(square, up, down)
-
-		max = 0
-		 
-		longest = []
-
-		for jump in potential_jumps:
-			chain = []
-			
-			chain.append(jump)
-
-			taken = 1
-
-			current = jump
-
-			while current.last:
-				taken += 1
-				
-				chain.append(current.last)
-
-				current = current.last
-
-			if len(chain) > max:
-				max = len(chain)
-
-				longest = chain
-
-		longest.reverse()
-
-		return longest
-	
-	
-	def _jumps_to_square(self, move, king):
-		up = self.squares[move.from_square] & 1 == checkers.RED
-
-		down = self.squares[move.from_square] & 1 == checkers.BLACK
-		
-		potential_jumps = [j for j in self.calculate_jumps(move.from_square, up or self.squares[move.from_square] & checkers.KING, down or self.squares[move.from_square] & checkers.KING)]
-
-		# Filter out weird duplicates
-		jumps = []
-
-		def filter_path(mp):
-			if str(mp) in jumps:
-				return False
-
-			jumps.append(str(mp))
-			
-			if type(move) is MultiJump:
-				for m in move.moves:
-					if m.from_square == mp.from_square and m.to_square == mp.to_square:
-						return True
-
-				return False
-			else:
-				return mp.to_square == move.to_square
-
-		
-		return [j for j in potential_jumps if filter_path(j)]
-	
-	def is_legal(self, move):
-		source = self.squares[move.from_square]
-
-		target = self.squares[move.to_square]
-
-		pos = checkers.index_to_square(move.from_square)
-
-		to = checkers.index_to_square(move.to_square)
-		
-		if target != checkers.EMPTY:
-			return False
-
-		if source & 1 != self.turn:
-			return False
-
-		up = self.squares[move.from_square] & 1 == checkers.RED
-		down = self.squares[move.from_square] & 1 == checkers.BLACK
-
-		jumps_taken = len(move.moves) if type(move) is MultiJump else 1
-		
-		if self.require_all_jumps and self.count_jumps(move.from_square, up or source & checkers.KING, down or source & checkers.KING) > jumps_taken:
-			return False
-
-		potential_jumps = sorted(self._jumps_to_square(move, source & checkers.KING), key = lambda jump: abs(jump.from_square - move.from_square))
-
-		if type(move) is MultiJump:
-			for i in range(len(move.moves)):
-				m = move.moves[i]
-				
-				if len([mm for mm in potential_jumps if mm.from_square == m.from_square and mm.to_square == m.to_square]) == 0:
-					return False
-
-			return True
-
-		if len(potential_jumps) > 1 and len([mm for mm in potential_jumps if mm.from_square == move.from_square and mm.to_square == move.to_square]) == 0:
-			return False
-
-		if pos[0] == to[0]:
-			return False
-
-		if abs("ABCDEFGH".index(pos[0]) - "ABCDEFGH".index(to[0])) > 1 or abs(int(pos[1]) - int(to[1])) > 1:
-			return False
-
-		if pos[1] == to[1]:
-			return False
-
-		if self.turn == checkers.RED:
-			if int(to[1]) < int(pos[1]) and not source & checkers.KING:
-				return False
-		else:
-			if int(to[1]) > int(pos[1]) and not source & checkers.KING:
-				return False
-
-		if self.require_jumps and self.has_jump(self.turn):
-			return False
-
-		return True
 	
 	def parse_uci(self, uci):
 		move = checkers.Move.from_uci(uci)
-
-		if not self.is_legal(move):
-			try:
-				self.play_move(move)
-
-				self.pop()
-			except Exception as e:
-				raise e
-
-		return move
-	
-	def play_move(self, move):
-		move.drops = []
 		
-		source = self.squares[move.from_square]
+		if type(move) == MultiJump:
+			for m in move.moves:
+				tile = Tile.jumped(self.squares[m.from_square[0]][m.from_square[1]], self.squares[m.to_square[0]][m.to_square[1]])
 
-		target = self.squares[move.to_square]
-
-		if source & 1 != self.turn:
-			raise checkers.IllegalMoveError(f"It is not {'reds' if source & 1 else 'blacks'} turn to move.")
-
-		pos = checkers.index_to_square(move.from_square)
-
-		to = checkers.index_to_square(move.to_square)
-
-		if target != checkers.EMPTY and move.to_square != move.from_square:
-			raise checkers.IllegalMoveError("Target square is not empty.")
-		
-		rows = "ABCDEFGH"
-
-		up = self.squares[move.from_square] & 1 == checkers.RED
-		down = self.squares[move.from_square] & 1 == checkers.BLACK
-
-		jumps_taken = len(move.moves) if type(move) is MultiJump else 1
-
-		print(self.count_jumps(move.from_square, up or source & checkers.KING, down or source & checkers.KING), jumps_taken)
-		
-		if self.require_all_jumps and self.count_jumps(move.from_square, up or source & checkers.KING, down or source & checkers.KING) > jumps_taken:
-			raise checkers.IllegalMoveError("All jumps must be taken.")
-
-		# Filter the list of potential jumps to jumps that end in the target square
-		# Sort the list of potential jumps by distance
-		potential_jumps = sorted(self._jumps_to_square(move, source & checkers.KING), key = lambda jump: abs(jump.from_square - move.from_square))
-
-		if type(move) is MultiJump:
-			populated = MultiJump([])
-			
-			for i in range(len(move.moves)):
-				m = move.moves[i]
-				
-				if len([mm for mm in potential_jumps if mm.from_square == m.from_square and mm.to_square == m.to_square]) == 0:
-					raise checkers.IllegalMoveError("Invalid path to target square.")
-
-				ptnmove = [mm for mm in potential_jumps if mm.from_square == m.from_square and mm.to_square == m.to_square][0]
-
-				# Get the potential jump that matches this move
-				self.do_move(ptnmove)
-
-				populated.moves.append(ptnmove)
-
-				move.drops += ptnmove.drops
-
-			self.move_stack.append(populated)
-
-			self.turn = not self.turn
-
-			return
-
-		if len(potential_jumps) > 1 and len([mm for mm in potential_jumps if mm.from_square == move.from_square and mm.to_square == move.to_square]) == 0:
-			raise checkers.InvalidMoveError("Ambiguous move.")
-
-		if len(potential_jumps) > 0:
-			chain = []
-
-			jump = potential_jumps[0]
-
-			chain.append(jump)
-
-			while jump.last:
-				chain.append(jump.last)
-
-				jump = jump.last
-
-			for m in reversed(chain):
-				move.drops.append(*m.drops)
-				self.push(m)
-
-			return
-
-		# If the columns match it's not a diagonal move
-		if pos[0] == to[0]:
-			raise checkers.IllegalMoveError("Illegal move.")
-
-		# If the row or columns are too far away it's an invalid move
-		if abs(rows.index(pos[0]) - rows.index(to[0])) > 1 or abs(int(pos[1]) - int(to[1])) > 1:
-			raise checkers.IllegalMoveError("Illegal move.")
-
-		if self.turn == checkers.RED:
-			if int(to[1]) < int(pos[1]) and not source & checkers.KING:
-				raise checkers.IllegalMoveError("Illegal move. (Cannot move backwards as a normal piece)")
+				if self.squares[tile[0]][tile[1]].piece:
+					m.drops.append(tile)
+					
+					move.drops.append(tile)
 		else:
-			if int(to[1]) > int(pos[1]) and not source & checkers.KING:
-				raise checkers.IllegalMoveError("Illegal move. (Cannot move backwards as a normal piece)")
+			tile = Tile.jumped(self.squares[move.from_square[0]][move.from_square[1]], self.squares[move.to_square[0]][move.to_square[1]])
 
-		if self.require_jumps and self.has_jump(self.turn):
-			raise checkers.IllegalMoveError("Illegal move. (A jump is available and must be taken)")
-
-		self.push(move)
+			if self.squares[tile[0]][tile[1]].piece:
+				move.drops.append(tile)
+			
+		return move
 
 	
-	def has_jump(self, player):
-		for square in self.get_player_pieces(player):
-			up = self.squares[square] & 1 == checkers.RED
+	
+	#def is_game_over(self):
 
-			down = self.squares[square] & 1 == checkers.BLACK
+	
+	#def winner(self):
 		
-			if self.calculate_jumps(square, up or self.squares[square] & checkers.KING, down or self.squares[square] & checkers.KING):
-				return True
 
-		return False
-
-	
-	def is_game_over(self):
-		return self.red_pieces == 0 or self.black_pieces == 0
-
-	
-	def winner(self):
-		if self.black_pieces == 0:
-			return checkers.RED
-
-		if self.red_pieces == 0:
-			return checkers.BLACK
-
-		return None
-		
 
 
 class LegalMoveGenerator:
@@ -630,71 +544,65 @@ class LegalMoveGenerator:
 
 		self.piece_index = 0
 
-		self.pieces = self.board.get_pieces()
-
-		self.visited = []
-
-		# A list of already known valid moves that haven't been returned yet
-		self.queued = []
+		self.pieces = [*self.board.red_pieces, *self.board.black_pieces]
 
 		# If true, then the generator will return valid moves that either player can make instead of just the current turn
 		self.any = any
 
+	def count(self):
+		return len(list(self))
+    
 	def __iter__(self):
-		return self
-
-	def next(self):
-		turn = self.board.turn
-
-		def scan(frm):
-			_rows = "ABCDEFGH"
-
-			_col = 1
-			
-			_c = 0
-			
-			for i in reversed(range(64)):
-				move = Move(checkers.SQUARES[frm], checkers.SQUARES[f"{_rows[i % 8]}{_col}"])
-
-				if self.board.is_legal(move) and not move.uci() in self.visited:
-					self.visited.append(move.uci())
-
-					return move
-			
-				_c += 1
-			
-				if _c == 8:
-					_c = 0
-					_col += 1
-
-			return None
-
-		result = None
+		pieces = self.pieces if self.any else (self.board.red_pieces if self.board.turn == checkers.RED else self.board.black_pieces)
 		
-		for i in self.board.get_player_pieces(self.board.turn):
-			if self.board.squares[i] != checkers.EMPTY:
-				up = self.board.squares[i] & 1 == checkers.RED
-				down = self.board.squares[i] & 1 == checkers.BLACK
+		for tile in pieces:
+			paths = tile.get_all_multijumps()
+
+			#print(paths)
+
+			for path in paths:
+				#print("PATH: ", path)
+				if len(path) == 3:
+					yield Move(path[0].index(), path[2].index(), [path[1].index()])
+
+					continue
+				
+				jump = MultiJump([])
+
+				iterator = path.__iter__()
+
+				try:
+					last = None
+					
+					while True:
+						move = Move(None, None, [])
+						
+						move.from_square = last.to_square if last else next(iterator).index()
+
+						drop = next(iterator).index()
+
+						move.drops = [drop] # [*board.legal_moves]
+
+						try:
+							move.to_square = next(iterator).index()
+
+							jump.drops.append(drop)
+	
+							jump.moves.append(move)
+
+							last = move
+						except StopIteration:
+							jump.moves.append(Move(last.to_square, drop, [move.from_square]))
+				except StopIteration:
+					pass
+
+				yield jump
+
+
+			
+			
+			if len(paths) == 0:
+				for move in tile.get_moves():
+					yield Move(move[0].index(), move[1].index(), [])
 		
-				jumps = self.board.get_longest_jump(i, up or self.board.squares[i] & checkers.KING, down or self.board.squares[i] & checkers.KING)
-				
-				if len(jumps) > 0:
-					move = MultiJump(jumps)
-
-					if not move.uci() in self.visited:
-						self.visited.append(move.uci())
-	
-						return move
-				
-				result = scan(checkers.index_to_square(i))
-	
-				if result != None:
-					break
-
-		if result == None:
-			raise StopIteration()
-
-		return result
-
-	def __next__(self):
-		return self.next()
+		return
