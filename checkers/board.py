@@ -12,6 +12,8 @@ class Move:
 
 		self.last = last
 
+		self.promoted = False
+
 	def __eq__(self, other):
 		return self.uci() == other.uci()
 		
@@ -418,7 +420,7 @@ class Board:
 	# Pseudo-fen
 	
 	def load_fen(self, fen):
-		spl = fen.replace("\n", "").split("/")
+		spl = fen[::-1].replace("\n", "").split("/")
 
 		i = 0
 
@@ -469,7 +471,7 @@ class Board:
 				if self.squares[x][y].piece:
 					tile = self.squares[x][y]
 
-					if self.turn == tile.piece.color == checkers.RED:
+					if tile.piece.color == checkers.RED:
 						self.red_pieces.append(tile)
 					else:
 						self.black_pieces.append(tile)
@@ -483,6 +485,9 @@ class Board:
 		for drop in move.drops:
 			self.squares[drop[0]][drop[1]].piece = self.squares[drop[0]][drop[1]].old_piece
 
+		if move.promoted:
+			self.squares[move.from_square[0]][move.from_square[1]].piece.type = checkers.PIECE
+
 		self.update_pieces()
 
 	def do_move(self, move):
@@ -494,6 +499,13 @@ class Board:
 			self.squares[drop[0]][drop[1]].old_piece = self.squares[drop[0]][drop[1]].piece
 			
 			self.squares[drop[0]][drop[1]].piece = None
+
+		promoterank = 7 if self.squares[move.to_square[0]][move.to_square[1]].piece.color == checkers.RED else 0
+
+		if self.squares[move.to_square[0]][move.to_square[1]].piece.type != checkers.KING and move.to_square[1] == promoterank:
+			self.squares[move.to_square[0]][move.to_square[1]].piece.type = checkers.KING
+
+			move.promoted = True
 
 		self.update_pieces()
 	
@@ -541,6 +553,14 @@ class Board:
 	
 	def parse_uci(self, uci):
 		move = checkers.Move.from_uci(uci)
+
+		if self.squares[move.from_square[0]][move.from_square[1]].piece == None:
+			raise checkers.InvalidMoveError("There is no piece on this square.")
+
+		promoterank = 7 if self.squares[move.from_square[0]][move.from_square[1]].piece.color == checkers.RED else 0
+
+		if self.squares[move.from_square[0]][move.from_square[1]].piece.type != checkers.KING and move.to_square[1] == promoterank:
+			move.promoted = True
 		
 		if type(move) == MultiJump:
 			for m in move.moves:
