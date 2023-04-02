@@ -420,7 +420,7 @@ class Board:
 	# Pseudo-fen
 	
 	def load_fen(self, fen):
-		spl = fen[::-1].replace("\n", "").split("/")
+		spl = [l[::-1] for l in fen[::-1].replace("\n", "").split("/")]
 
 		i = 0
 
