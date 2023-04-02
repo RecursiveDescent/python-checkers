@@ -12,6 +12,9 @@ class Move:
 
 		self.last = last
 
+	def __eq__(self, other):
+		return self.uci() == other.uci()
+		
 	# Convenience for getting tile from the index
 	def source(self, board):
 		return board[self.from_square[0]][self.from_square[1]]
@@ -150,6 +153,8 @@ class Tile:
 		self.y = y
 		
 		self.piece = piece
+
+		self.old_piece = None
 
 		self.upper_left = None
 
@@ -454,18 +459,43 @@ class Board:
 	
 	#def do_move(self, move):
 
-	
-	#def undo_move(self, move):
+	def update_pieces(self):
+		self.red_pieces = []
 
+		self.black_pieces = []
 
+		for y in range(8):
+			for x in range(8):
+				if self.squares[x][y].piece:
+					piece = self.squares[x][y].piece
 
-
-
-
+					if self.turn == piece.color == checkers.RED:
+						self.red_pieces.append(piece)
+					else:
+						self.black_pieces.append(piece)
 		
+	
+	def undo_move(self, move):
+		self.squares[move.from_square[0]][move.from_square[1]].piece = self.squares[move.to_square[0]][move.to_square[1]].piece
+		
+		self.squares[move.to_square[0]][move.to_square[1]].piece = None
+
+		for drop in move.drops:
+			self.squares[drop[0]][drop[1]].piece = self.squares[drop[0]][drop[1]].old_piece
+
+		self.update_pieces()
 
 	def do_move(self, move):
-		self.squares123123412
+		self.squares[move.to_square[0]][move.to_square[1]].piece = self.squares[move.from_square[0]][move.from_square[1]].piece
+
+		self.squares[move.from_square[0]][move.from_square[1]].piece = None
+
+		for drop in move.drops:
+			self.squares[drop[0]][drop[1]].old_piece = self.squares[drop[0]][drop[1]].piece
+			
+			self.squares[drop[0]][drop[1]].piece = None
+
+		self.update_pieces()
 	
 	def push(self, move):
 		if type(move) is MultiJump:
@@ -506,8 +536,8 @@ class Board:
 		
 		return self.move_stack[-1]
 	
-	#def is_legal(self, move):
-	
+	def is_legal(self, move):
+		return move in self.legal_moves
 	
 	def parse_uci(self, uci):
 		move = checkers.Move.from_uci(uci)
@@ -523,18 +553,40 @@ class Board:
 		else:
 			tile = Tile.jumped(self.squares[move.from_square[0]][move.from_square[1]], self.squares[move.to_square[0]][move.to_square[1]])
 
-			if self.squares[tile[0]][tile[1]].piece:
+			if self.squares[tile[0]][tile[1]].piece and (tile[0] != move.from_square[0] and tile[1] != move.from_square[1]) :
 				move.drops.append(tile)
 			
 		return move
 
-	
-	
-	#def is_game_over(self):
+	def play_move(self, move):
+		if not self.is_legal(move):
+			pieces = self.red_pieces if self.turn == checkers.RED else self.black_pieces
 
-	
-	#def winner(self):
+			for tile in pieces:
+				if len(tile.get_all_multijumps()) > 0:
+					raise checkers.IllegalMoveError("Illegal move. A jump is available and must be taken.")
+			
+			raise checkers.IllegalMoveError("Illegal move.")
+
+		if self.is_game_over():
+			raise checkers.IllegalMoveError("Game has ended.")
+
 		
+		self.push(move)
+	
+	def is_game_over(self):
+		return len(self.red_pieces) == 0 or len(self.black_pieces) == 0
+	
+	def winner(self):
+		if len(self.black_pieces) == 0:
+			return checkers.RED
+
+		if len(self.red_pieces) == 0:
+			return checkers.BLACK
+
+		return None
+
+							   
 
 
 
