@@ -467,12 +467,12 @@ class Board:
 		for y in range(8):
 			for x in range(8):
 				if self.squares[x][y].piece:
-					piece = self.squares[x][y].piece
+					tile = self.squares[x][y]
 
-					if self.turn == piece.color == checkers.RED:
-						self.red_pieces.append(piece)
+					if self.turn == tile.piece.color == checkers.RED:
+						self.red_pieces.append(tile)
 					else:
-						self.black_pieces.append(piece)
+						self.black_pieces.append(tile)
 		
 	
 	def undo_move(self, move):
@@ -564,7 +564,7 @@ class Board:
 
 			for tile in pieces:
 				if len(tile.get_all_multijumps()) > 0:
-					raise checkers.IllegalMoveError("Illegal move. A jump is available and must be taken.")
+					raise checkers.IllegalMoveError(f"Illegal move. A jump is available and must be taken.\nFirst legal move: \"{next(iter(self.legal_moves)).uci()}\"")
 			
 			raise checkers.IllegalMoveError("Illegal move.")
 
