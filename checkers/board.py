@@ -14,6 +14,12 @@ class Move:
 
 		self.promoted = False
 
+	def get_from(self):
+		return self.from_square
+
+	def get_to(self):
+		return self.to_square
+
 	def __eq__(self, other):
 		return self.uci() == other.uci()
 		
@@ -92,6 +98,12 @@ class MultiJump(Move):
 			super().__init__(self.moves[0].from_square, self.moves[-1].to_square)
 		else:
 			super().__init__(0, 0)
+
+	def get_from(self):
+		return self.moves[0].from_square
+
+	def get_to(self):
+		return self.moves[len(self.moves) - 1].to_square
 
 	def squares(self):
 		sqrs = []
@@ -577,6 +589,47 @@ class Board:
 				move.drops.append(tile)
 			
 		return move
+
+	def expand_move(self, move):
+		moves = [*self.legal_moves]
+
+		# board.expand_move(board.parse_uci("D4B6D8"))
+
+		def squares(move):
+			sq = []
+
+			mvs = move.moves if type(move) is MultiJump else [move]
+
+			for m in mvs:
+				sq.append(m.from_square)
+
+				sq.append(m.to_square)
+				
+			return sq
+		
+		sqs = squares(move)
+
+		print(sqs)
+		
+		matches = [*filter(lambda m: m.get_from() == move.get_from() and m.get_to() == move.get_to(), moves)]
+
+		filtered = []
+
+		for match in matches:
+			try:
+				if not match.get_from() in sqs or not match.get_to() in sqs or match.uci()[:match.uci().index(checkers.index_to_square(sqs[-2])) + 2] != move.uci()[:move.uci().index(checkers.index_to_square(sqs[-2])) + 2]:
+					continue
+			except:
+				continue
+
+			
+
+			filtered.append(match)
+
+		if len(filtered) > 1:
+				raise checkers.AmbiguousMoveError("Ambiguous shorthand move.")
+
+		return filtered[0]
 
 	def play_move(self, move):
 		if not self.is_legal(move):
