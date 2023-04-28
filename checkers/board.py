@@ -635,7 +635,7 @@ class Board:
 		return filtered[0]
 
 	def play_move(self, move):
-		move = self.expand_move(move)
+		move = self.expand_move(move) or move
 		
 		if not self.is_legal(move):
 			pieces = self.red_pieces if self.turn == checkers.RED else self.black_pieces
