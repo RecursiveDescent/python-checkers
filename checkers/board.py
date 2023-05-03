@@ -487,7 +487,6 @@ class Board:
 						self.red_pieces.append(tile)
 					else:
 						self.black_pieces.append(tile)
-		
 	
 	def undo_move(self, move):
 		self.squares[move.from_square[0]][move.from_square[1]].piece = self.squares[move.to_square[0]][move.to_square[1]].piece
@@ -533,7 +532,6 @@ class Board:
 		self.turn = not self.turn
 
 		self.legal_moves = LegalMoveGenerator(self)
-
 	
 	def pop(self):
 		if len(self.move_stack) == 0:
@@ -552,7 +550,6 @@ class Board:
 		self.legal_moves = LegalMoveGenerator(self)
 
 		return move
-
 	
 	def peek(self):
 		if len(self.move_stack) == 0:
@@ -588,7 +585,7 @@ class Board:
 			if self.squares[tile[0]][tile[1]].piece and (tile[0] != move.from_square[0] and tile[1] != move.from_square[1]) :
 				move.drops.append(tile)
 			
-		return move
+		return self.expand_move(move) or move
 
 	def expand_move(self, move):
 		moves = [*self.legal_moves]
@@ -635,8 +632,6 @@ class Board:
 		return filtered[0]
 
 	def play_move(self, move):
-		move = self.expand_move(move) or move
-		
 		if not self.is_legal(move):
 			pieces = self.red_pieces if self.turn == checkers.RED else self.black_pieces
 
