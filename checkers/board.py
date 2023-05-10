@@ -648,13 +648,17 @@ class Board:
 		self.push(move)
 	
 	def is_game_over(self):
-		return len(self.red_pieces) == 0 or len(self.black_pieces) == 0
+		return len(self.red_pieces) == 0 or len(self.black_pieces) == 0 or len([*self.legal_moves]) == 0
 	
 	def winner(self):
-		if len(self.black_pieces) == 0:
+		redmoves = [*LegalMoveGenerator(self, turn = checkers.RED)]
+		
+		blackmoves = [*LegalMoveGenerator(self, turn = checkers.BLACK)]
+		
+		if len(self.black_pieces) == 0 or len(blackmoves) == 0:
 			return checkers.RED
 
-		if len(self.red_pieces) == 0:
+		if len(self.red_pieces) == 0 or len(redmoves) == 0:
 			return checkers.BLACK
 
 		return None
@@ -664,8 +668,10 @@ class Board:
 
 
 class LegalMoveGenerator:
-	def __init__(self, board, any = False):
+	def __init__(self, board, any = False, turn = None):
 		self.board = board
+
+		self.turn = self.board.turn if turn == None else turn
 
 		self.piece_index = 0
 
@@ -678,7 +684,7 @@ class LegalMoveGenerator:
 		return len(list(self))
     
 	def __iter__(self):
-		pieces = self.pieces if self.any else (self.board.red_pieces if self.board.turn == checkers.RED else self.board.black_pieces)
+		pieces = self.pieces if self.any else (self.board.red_pieces if self.turn == checkers.RED else self.board.black_pieces)
 
 		has_jump = False
 		
